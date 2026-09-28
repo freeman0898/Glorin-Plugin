@@ -42,16 +42,6 @@ from qgis.core import (
     QgsVectorFileWriter,
 )
 
-from ..utils import (
-    translate as _,
-    add_or_update_ee_raster_layer,
-    get_ee_properties,
-    get_available_bands,
-    filter_functions,
-    get_ee_extent,
-    parse_extent_string,
-    normalize_crs,
-)
 
 from PyQt5.QtCore import QVariant
 from qgis import processing
@@ -66,6 +56,8 @@ SENSOR_CONFIG = {
             "red": "B4",
             "nir": "B8",
             "swir1": "B11",
+            "blue": "B2",
+            "swir2": "B12",
         },
         # Sentinel-2 stores cloud cover as CLOUDY_PIXEL_PERCENTAGE.
         "cloud_property": "CLOUDY_PIXEL_PERCENTAGE",
@@ -79,6 +71,8 @@ SENSOR_CONFIG = {
             "red": "SR_B4",
             "nir": "SR_B5",
             "swir1": "SR_B6",
+            "blue": "SR_B2",
+            "swir2": "SR_B7",
         },
         "cloud_property": "CLOUD_COVER",
         "native_scale": 30,
@@ -90,6 +84,8 @@ SENSOR_CONFIG = {
             "red": "SR_B3",
             "nir": "SR_B4",
             "swir1": "SR_B5",
+            "blue": "SR_B1",
+            "swir2": "SR_B7",
         },
         "cloud_property": "CLOUD_COVER",
         "native_scale": 30,
@@ -101,6 +97,8 @@ SENSOR_CONFIG = {
             "red": "SR_B3",
             "nir": "SR_B4",
             "swir1": "SR_B5",
+            "blue": "SR_B1",
+            "swir2": "SR_B7",
         },
         "cloud_property": "CLOUD_COVER",
         "native_scale": 30,
@@ -154,11 +152,135 @@ def add_mndwi(image: ee.Image, bands: dict) -> ee.Image:
     """
     mndwi = image.normalizedDifference([bands["green"], bands["swir1"]]).rename("MNDWI")
     return image.addBands(mndwi)
+    
+def add_ndsi(image: ee.Image, bands: dict) -> ee.Image:
+    """NDSI (Dozier 1989) = (Green - SWIR1) / (Green + SWIR1).
+
+    Snow discrimination index. Snow is highly reflective in green and
+    absorptive in SWIR1, giving high positive values. Water also
+    produces positive values, so NDSI alone can't separate snow from
+    water — use alongside MNDWI.
+    """
+    ndsi = image.normalizedDifference([bands["green"], bands["swir1"]]).rename("NDSI")
+    return image.addBands(ndsi)
+
+
+def add_ndti(image: ee.Image, bands: dict) -> ee.Image:
+    """NDTI (Lacaux et al. 2007) = (Red - Green) / (Red + Green).
+
+    Normalized Difference Turbidity Index. Turbid water reflects more
+    in red than in green, so higher values indicate increasing
+    suspended sediment concentration. Useful for monitoring water
+    quality along river stretches.
+    """
+    ndti = image.normalizedDifference([bands["red"], bands["green"]]).rename("NDTI")
+    return image.addBands(ndti)
+
+
+def add_evi(image: ee.Image, bands: dict) -> ee.Image:
+    """EVI (Huete et al. 2002) = 2.5 * (NIR - Red) / (NIR + 6*Red - 7.5*Blue + 1).
+
+    Enhanced Vegetation Index. Like NDVI but includes a blue-band
+    correction and a soil-adjustment factor, reducing atmospheric
+    and canopy-background noise. Performs better than NDVI in
+    high-biomass regions where NDVI saturates.
+    """
+    evi = image.expression(
+        "2.5 * (NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1)",
+        {
+            "NIR": image.select(bands["nir"]),
+            "RED": image.select(bands["red"]),
+            "BLUE": image.select(bands["blue"]),
+        },
+    ).rename("EVI")
+    return image.addBands(evi)
+
+
+def add_savi(image: ee.Image, bands: dict) -> ee.Image:
+    """SAVI (Huete 1988) = (1 + L) * (NIR - Red) / (NIR + Red + L), L = 0.5.
+
+    Soil-Adjusted Vegetation Index. Suppresses the brightness of
+    the soil background in sparsely vegetated areas — useful along
+    river banks where bare ground and low vegetation mix.
+    """
+    savi = image.expression(
+        "1.5 * (NIR - RED) / (NIR + RED + 0.5)",
+        {
+            "NIR": image.select(bands["nir"]),
+            "RED": image.select(bands["red"]),
+        },
+    ).rename("SAVI")
+    return image.addBands(savi)
+
+
+def add_gndvi(image: ee.Image, bands: dict) -> ee.Image:
+    """GNDVI (Gitelson et al. 1996) = (NIR - Green) / (NIR + Green).
+
+    Green NDVI. Substitutes the green band for red, making it more
+    sensitive to chlorophyll concentration. Often outperforms NDVI
+    for detecting vegetation stress and nitrogen deficiency.
+    """
+    gndvi = image.normalizedDifference([bands["nir"], bands["green"]]).rename("GNDVI")
+    return image.addBands(gndvi)
+
+
+def add_ndmi(image: ee.Image, bands: dict) -> ee.Image:
+    """NDMI (Gao 1996) = (NIR - SWIR1) / (NIR + SWIR1).
+
+    Normalized Difference Moisture Index. Estimates vegetation
+    water content. High values indicate moist, healthy vegetation;
+    low or negative values indicate dry vegetation, bare soil, or
+    water bodies (water absorbs NIR, producing strongly negative
+    values).
+    """
+    ndmi = image.normalizedDifference([bands["nir"], bands["swir1"]]).rename("NDMI")
+    return image.addBands(ndmi)
+
+
+def add_awei(image: ee.Image, bands: dict) -> ee.Image:
+    """AWEIsh (Feyisa et al. 2014) = Blue + 2.5*Green - 1.5*(NIR + SWIR1) - 0.25*SWIR2.
+
+    Automated Water Extraction Index (shadow variant). Designed to
+    maximise separability of water from shadow and other dark surfaces
+    that plague simpler indices like NDWI. Positive values indicate
+    water; negative values indicate non-water.
+    """
+    awei = image.expression(
+        "BLUE + 2.5 * GREEN - 1.5 * (NIR + SWIR1) - 0.25 * SWIR2",
+        {
+            "BLUE": image.select(bands["blue"]),
+            "GREEN": image.select(bands["green"]),
+            "NIR": image.select(bands["nir"]),
+            "SWIR1": image.select(bands["swir1"]),
+            "SWIR2": image.select(bands["swir2"]),
+        },
+    ).rename("AWEI")
+    return image.addBands(awei)
+
+
+def add_ndbi(image: ee.Image, bands: dict) -> ee.Image:
+    """NDBI (Zha et al. 2003) = (SWIR1 - NIR) / (SWIR1 + NIR).
+
+    Normalized Difference Built-up Index. Built-up areas have higher
+    reflectance in SWIR1 than NIR, giving positive values. Useful for
+    identifying urban/developed land along river corridors — high
+    NDBI near a river may indicate channelisation or hardening.
+    """
+    ndbi = image.normalizedDifference([bands["swir1"], bands["nir"]]).rename("NDBI")
+    return image.addBands(ndbi)
 
 INDEX_FUNCTIONS = {
     "NDVI": add_ndvi,
     "NDWI": add_ndwi,
     "MNDWI": add_mndwi,
+    "NDSI": add_ndsi,
+    "NDTI": add_ndti,
+    "EVI": add_evi,
+    "SAVI": add_savi,
+    "GNDVI": add_gndvi,
+    "NDMI": add_ndmi,
+    "AWEI": add_awei,
+    "NDBI": add_ndbi,
 }
  
 INDEX_NAMES = list(INDEX_FUNCTIONS.keys())
@@ -281,10 +403,11 @@ class RiverAnalysisAlgorithm(QgsProcessingAlgorithm):
         #Sinuosity Inputs
         self.addParameter(QgsProcessingParameterFeatureSource(
         'INPUT',
-        'Input layer'))
+        'Input river layer',
+        [QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterCrs(
         'CRS',
-        'Input CRS (UTM)'))
+        'Desired CRS (UTM)'))
         self.addParameter(QgsProcessingParameterPoint(
         'START POINT',
         'Start point',))
@@ -514,7 +637,6 @@ class RiverAnalysisAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo(f"Output written to {dest_path}")
             return {self.OUTPUT: dest_path}
 
-        # --- vector formats: real geometry via the memory-layer path ---
         field_names = ["crow_flies", "river_length", "sinuosity"] + safe_keys
 
         fields = QgsFields()

@@ -43,12 +43,12 @@ from qgis.PyQt.QtWidgets import QAction
 import ee
 
 # Import the code for the dialog
-from . import  provider, config, ee_auth, utils, logging
+from . import  provider, config, ee_auth1, utils, logging
 from .ui import menus
 from . processing.processing_provider import GlorinProcessingProvider
 from . processing.sinuosity import SinuosityAlgorithm
-from . processing.pull_imagery import PullRiverImageryAlgorithm
 from . processing.River_analysis import RiverAnalysisAlgorithm
+from . processing.segmented_analysis import SegmentedRiverAnalysisAlgorithm
 
     
 PLUGIN_DIR = os.path.dirname(__file__)
@@ -155,10 +155,10 @@ class Glorin_Sinuosity:
             triggered=self._run_cmd_set_cloud_project,
         )
         
-        pull_imagery_button = QtWidgets.QAction(
-        text=self.tr("Pull Satellite Imagery"),
+        segmented_analysis_button = QtWidgets.QAction(
+        text=self.tr("Segmented River Analysis"),
         parent=self.iface.mainWindow(),
-        triggered = lambda: processing.execAlgorithmDialog("glorin:pull_river_imagery"),)
+        triggered = lambda: processing.execAlgorithmDialog("glorin:segmented_river_analysis"),)
         
         sinuosity_button = QtWidgets.QAction(
         text=self.tr("Measure Sinuosity"),
@@ -176,8 +176,8 @@ class Glorin_Sinuosity:
         )
         # Initialize EE after GUI is ready
         try:
-            ee_auth.ensure_authenticated(self.ee_config)
-            ee_auth.ee_initialize_with_project(self.ee_config)
+            ee_auth1.ensure_authenticated(self.ee_config)
+            ee_auth1.ee_initialize_with_project(self.ee_config)
         except Exception as e:
             # Log the error but don't crash the plugin
             import traceback
@@ -208,13 +208,14 @@ class Glorin_Sinuosity:
             menus.Action(action=self.set_cloud_project_action),
             menus.Separator(),
             menus.Action(action=sinuosity_button),
-            menus.Action(action=pull_imagery_button),
-            menus.Action(action=river_analysis_button)])        
+            menus.Action(action=river_analysis_button),
+            menus.Action(action=segmented_analysis_button)])        
         
     def unload(self):
         
         for name in ('sign_in_action', 'set_cloud_project_action',
-                 'pull_imagery_button', 'sinuosity_button'):
+                 'segmented_analysis_button', 'sinuosity_button',
+                 'river_analysis_button'):
             act = getattr(self, name, None)
             if act is not None:
                 self.menu.removeAction(act)
@@ -241,4 +242,4 @@ class Glorin_Sinuosity:
         self._run_cmd_set_cloud_project()
 
     def _run_cmd_set_cloud_project(self):
-        ee_auth.ee_initialize_with_project(self.ee_config, force=True)    
+        ee_auth1.ee_initialize_with_project(self.ee_config, force=True)    

@@ -6,6 +6,7 @@ from typing import Optional
 
 import ee
 from qgis.PyQt.QtWidgets import QInputDialog, QLineEdit, QMessageBox
+from qgis.utils import iface
 
 from .config import EarthEngineConfig
 
@@ -25,7 +26,7 @@ def ee_authenticate(ee_config: EarthEngineConfig) -> bool:
     and follow the authentication process or click Cancel to skip"""
 
     reply = QMessageBox.warning(
-        None,
+        iface.mainWindow(),
         "Authenticate Google Earth Engine",
         msg,
         QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok,

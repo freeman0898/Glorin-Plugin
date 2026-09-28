@@ -7,9 +7,9 @@ from qgis.core import QgsProcessingProvider
 from qgis.PyQt.QtGui import QIcon
 
 
-from .pull_imagery import PullRiverImageryAlgorithm
 from .sinuosity import SinuosityAlgorithm
 from .River_analysis import RiverAnalysisAlgorithm
+from .segmented_analysis import SegmentedRiverAnalysisAlgorithm
  
 class GlorinProcessingProvider(QgsProcessingProvider):
     """Provider for GLORIN river analysis tools."""
@@ -28,9 +28,9 @@ class GlorinProcessingProvider(QgsProcessingProvider):
         Register every algorithm this plugin exposes. To add a new tool,
         import it at the top of this file and add one line here.
         """
-        self.addAlgorithm(PullRiverImageryAlgorithm())
         self.addAlgorithm(SinuosityAlgorithm())
         self.addAlgorithm(RiverAnalysisAlgorithm())
+        self.addAlgorithm(SegmentedRiverAnalysisAlgorithm())
         
     def icon(self) -> QIcon:
         return self._icon
