@@ -6,9 +6,11 @@
 name=Glorin Sinuosity
 qgisMinimumVersion=3.0
 description=Finds sinuosity of a segment of river and calculates environmental statistics of the surrounding area
-version=1.1
+version=1.0
 author=Jacob Freeman
 email=freeman0898@gmail.com
+supervisors=Kaveh Ghahraman, Michael Nones
+supervisor_emails=kaveh.ghahraman@igf.edu.pl, mnones@igf.edu.pl
 
 about=Finds sinuosity of a segment of river and calculates environmental statistics of the surrounding area using Google Earth Engine for aerial imagery.
 
