@@ -58,7 +58,8 @@ class SinuosityAlgorithm(QgsProcessingAlgorithm):
         return "glorin"
 
     def shortHelpString(self) -> str:
-        return "This tool can be used to find only the sinuosity of a river from a shapefile"
+        return "This tool can be used to find only the sinuosity of a river from a shapefile."
+        "Also calculates sinuosity over multiple rivers so long as they flow into each other. "
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None):
 

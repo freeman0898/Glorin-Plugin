@@ -8,8 +8,9 @@ from qgis.PyQt.QtGui import QIcon
 
 
 from .sinuosity import SinuosityAlgorithm
-from .River_analysis import RiverAnalysisAlgorithm
-from .segmented_analysis import SegmentedRiverAnalysisAlgorithm
+from .manual_segment_analysis import ManualSegmentAnalysisAlgorithm
+from .segmented_reach_analysis import SegmentedReachAnalysisAlgorithm
+from .custom_calculator import CustomRasterCalculatorAlgorithm
  
 class GlorinProcessingProvider(QgsProcessingProvider):
     """Provider for GLORIN river analysis tools."""
@@ -29,8 +30,9 @@ class GlorinProcessingProvider(QgsProcessingProvider):
         import it at the top of this file and add one line here.
         """
         self.addAlgorithm(SinuosityAlgorithm())
-        self.addAlgorithm(RiverAnalysisAlgorithm())
-        self.addAlgorithm(SegmentedRiverAnalysisAlgorithm())
+        self.addAlgorithm(ManualSegmentAnalysisAlgorithm())
+        self.addAlgorithm(SegmentedReachAnalysisAlgorithm())
+        self.addAlgorithm(CustomRasterCalculatorAlgorithm())
         
     def icon(self) -> QIcon:
         return self._icon
