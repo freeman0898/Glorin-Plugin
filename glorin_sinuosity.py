@@ -47,8 +47,9 @@ from . import  provider, config, ee_auth1, utils, logging
 from .ui import menus
 from . processing.processing_provider import GlorinProcessingProvider
 from . processing.sinuosity import SinuosityAlgorithm
-from . processing.River_analysis import RiverAnalysisAlgorithm
-from . processing.segmented_analysis import SegmentedRiverAnalysisAlgorithm
+from . processing.manual_segment_analysis import ManualSegmentAnalysisAlgorithm
+from . processing.segmented_reach_analysis import SegmentedReachAnalysisAlgorithm
+from . processing.custom_calculator import CustomRasterCalculatorAlgorithm
 
     
 PLUGIN_DIR = os.path.dirname(__file__)
@@ -155,20 +156,25 @@ class Glorin_Sinuosity:
             triggered=self._run_cmd_set_cloud_project,
         )
         
-        segmented_analysis_button = QtWidgets.QAction(
-        text=self.tr("Segmented River Analysis"),
+        segmented_reach_analysis_button = QtWidgets.QAction(
+        text=self.tr("Segmented Reach Analysis"),
         parent=self.iface.mainWindow(),
-        triggered = lambda: processing.execAlgorithmDialog("glorin:segmented_river_analysis"),)
+        triggered = lambda: processing.execAlgorithmDialog("glorin:segmented_reach_analysis"),)
         
         sinuosity_button = QtWidgets.QAction(
         text=self.tr("Measure Sinuosity"),
         parent = self.iface.mainWindow(),
         triggered=lambda: processing.execAlgorithmDialog("glorin:Sinuosity"),)
         
-        river_analysis_button = QtWidgets.QAction(
-        text=self.tr("River Analysis"),
+        manual_segment_analysis_button = QtWidgets.QAction(
+        text=self.tr("Manual Segment Analysis"),
         parent=self.iface.mainWindow(),
-        triggered=lambda: processing.execAlgorithmDialog("glorin:river_analysis"),)
+        triggered=lambda: processing.execAlgorithmDialog("glorin:manual_segment_analysis"),)
+        
+        custom_calculator_button = QtWidgets.QAction(
+        text=self.tr("Custom Calculation"),
+        parent=self.iface.mainWindow(),
+        triggered=lambda: processing.execAlgorithmDialog("glorin:custom_raster_calculator"),)
         
         plugin_menu = cast(QtWidgets.QMenu, self.iface.pluginMenu())
         self.menu = plugin_menu.addMenu(
@@ -208,14 +214,15 @@ class Glorin_Sinuosity:
             menus.Action(action=self.set_cloud_project_action),
             menus.Separator(),
             menus.Action(action=sinuosity_button),
-            menus.Action(action=river_analysis_button),
-            menus.Action(action=segmented_analysis_button)])        
+            menus.Action(action=manual_segment_analysis_button),
+            menus.Action(action=segmented_reach_analysis_button),
+            menus.Action(action=custom_calculator_button)],)        
         
     def unload(self):
         
         for name in ('sign_in_action', 'set_cloud_project_action',
-                 'segmented_analysis_button', 'sinuosity_button',
-                 'river_analysis_button'):
+                 'segmented_reach_analysis_button', 'sinuosity_button',
+                 'manual_segment_analysis_button', 'custom_calculator_button'):
             act = getattr(self, name, None)
             if act is not None:
                 self.menu.removeAction(act)
