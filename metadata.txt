@@ -5,17 +5,22 @@
 [general]
 name=Glorin Sinuosity
 qgisMinimumVersion=3.0
-description=Finds sinuosity of a segment of river and calculates environmental statistics of the surrounding area
+description=Finds sinuosity of a segment of river and calculates environmental 
+	statistics of within a given area around said segment. Designed to be used 
+	with the Glorin Dataset
 version=1.0
 author=Jacob Freeman
 email=freeman0898@gmail.com
-supervisors=Kaveh Ghahraman, Michael Nones
-supervisor_emails=kaveh.ghahraman@igf.edu.pl, mnones@igf.edu.pl
 
-about=Finds sinuosity of a segment of river and calculates environmental statistics of the surrounding area using Google Earth Engine for aerial imagery.
 
-tracker=https://github.com/freeman0898/Freeman-Test.git
-repository=https://github.com/freeman0898/Freeman-Test.git
+about=Finds sinuosity of a segment of river and calculates environmental 
+	statistics of the surrounding area using Google Earth Engine for aerial imagery.
+	<p>Developed by Jacob Freeman.</p>
+	<p>Supervised by <a href="mailto:nones@igf.edu.pl">Dr.hab. Michael Nones</a>
+	and <a href="mailto:kaveh.ghahraman@igf.edu.pl">Dr. Kaveh Ghahraman</a>.</p>
+
+tracker=https://github.com/freeman0898/Glorin-Plugin.git
+repository=https://github.com/freeman0898/Glorin-Plugin.git
 # End of mandatory metadata
 
 # Recommended items:
