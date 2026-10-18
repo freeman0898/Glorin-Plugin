@@ -243,7 +243,8 @@ class CustomRasterCalculatorAlgorithm(QgsProcessingAlgorithm):
             [QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterCrs(
             self.CRS,
-            "Working CRS (UTM)"))  
+            "Working CRS (leave unset to use the river layer's CRS) (UTM recommended)",
+            optional=True))  
         self.addParameter(QgsProcessingParameterField(
             self.ID_FIELD,
             "River ID field",
@@ -257,7 +258,7 @@ class CustomRasterCalculatorAlgorithm(QgsProcessingAlgorithm):
             self.SEGMENT_MODE,
             "Segmentation mode",
             options=SEGMENT_MODES,
-            defaultValue=0))  # whole river = old behaviour
+            defaultValue=0))  # whole river
         self.addParameter(QgsProcessingParameterNumber(
             self.SEGMENT_LENGTH,
             "Segment length (km)",
@@ -315,6 +316,16 @@ class CustomRasterCalculatorAlgorithm(QgsProcessingAlgorithm):
             "STATS", "Expression Statistics"))
 
     def processAlgorithm(self, parameters, context, feedback):
+        
+        from .. import config
+        
+        ee_config = config.EarthEngineConfig()
+        if not ee_config.read():
+            raise QgsProcessingException(
+                "Not signed in to Google Earth Engine. "
+                "Sign in via Plugins ▸ GLORIN ▸ Sign in to Earth Engine, "
+                "then run this tool again."
+            )
 
         feedback.pushInfo("=== Phase 1: Selecting river by ID ===")
 
@@ -338,9 +349,16 @@ class CustomRasterCalculatorAlgorithm(QgsProcessingAlgorithm):
             raise QgsProcessingException("No expression provided.")
         if not stat_names:
             raise QgsProcessingException("Select at least one statistic.")
+            
+        if not crs.isValid():          
+            crs = river_source.sourceCrs()
+            feedback.pushInfo(f"Using input layer CRS: {crs.authid()}")
+            
+        if crs.isGeographic():
+            feedback.pushWarning(
+                f"{crs.authid()} is geographic — lengths will be in degrees. "
+                "Pick a projected CRS (e.g. the local UTM zone) for meaningful sinuosity.")
 
-        # Reproject to the working CRS so all distance work happens in
-        # metres. Geographic CRS would give degrees.
         reprojected = processing.run(
             "native:reprojectlayer",
             {
@@ -503,7 +521,12 @@ class CustomRasterCalculatorAlgorithm(QgsProcessingAlgorithm):
                 seg_geom, crs, context)
             aoi = river_ee_geom.buffer(buffer_m)
 
-            ic = ee.ImageCollection(collection_id)
+            if isinstance(sensor_cfg["collection"], list):
+                ic = ee.ImageCollection(sensor_cfg["collection"][0])
+                for extra_id in sensor_cfg["collection"][1:]:
+                    ic = ic.merge(ee.ImageCollection(extra_id))
+            else:
+                ic = ee.ImageCollection(collection_id)
             ic = ic.filterDate(start_date, end_date)
             ic = ic.filterBounds(aoi)
             ic = ic.filter(ee.Filter.lte(cloud_prop, max_cloud))

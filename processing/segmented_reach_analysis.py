@@ -57,7 +57,10 @@ from .manual_segment_analysis import (
 
 logger = logging.getLogger(__name__)
 
-
+SEGMENT_MODES = ["Whole river (no segmentation)",
+                 "Split by length (km)",
+                 "Split by number of segments"]
+                 
 STAT_EE_SUFFIX = { 
     "Mean": "mean", 
     "Median": "median", 
@@ -200,11 +203,12 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
         # --- River selection ---
         self.addParameter(QgsProcessingParameterFeatureSource(
             self.INPUT,
-            "River line layer",
+            "River layer",
             [QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterCrs(
             self.CRS,
-            "Working CRS (UTM)"))
+            "Working CRS (leave unset to use the river layer's CRS) (UTM recommended)",
+            optional=True))
         self.addParameter(QgsProcessingParameterField(
             self.ID_FIELD,
             "River ID field",
@@ -216,19 +220,17 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
         # --- Segment parameters ---
         self.addParameter(QgsProcessingParameterEnum(
             self.SEGMENT_MODE,
-            "Split by",
-            options=["Length (km)", "Number of segments"],
-            defaultValue=0))
+            "Segmentation mode",
+            options=SEGMENT_MODES,
+            defaultValue=0))  # whole river
         self.addParameter(QgsProcessingParameterNumber(
             self.SEGMENT_LENGTH,
             "Segment length (km)",
-            type=QgsProcessingParameterNumber.Double,
-            defaultValue=100.0,
+            defaultValue=100,
             minValue=5))
         self.addParameter(QgsProcessingParameterNumber(
             self.SEGMENT_COUNT,
             "Number of segments",
-            type=QgsProcessingParameterNumber.Integer,
             defaultValue=5,
             minValue=1))
 
@@ -276,6 +278,16 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
             "Segmented Reach Analysis"))
 
     def processAlgorithm(self, parameters, context, feedback):
+        
+        from .. import config
+        
+        ee_config = config.EarthEngineConfig()
+        if not ee_config.read():
+            raise QgsProcessingException(
+                "Not signed in to Google Earth Engine. "
+                "Sign in via Plugins ▸ GLORIN ▸ Sign in to Earth Engine, "
+                "then run this tool again."
+            )
 
         feedback.pushInfo("=== Phase 1: Selecting river by ID ===")
 
@@ -298,7 +310,16 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
                 f"No river found with {id_field} = '{river_id}'. "
                 "Check the field name and ID value."
             )
-
+        
+        if not crs.isValid():          
+            crs = river_source.sourceCrs()
+            feedback.pushInfo(f"Using input layer CRS: {crs.authid()}")
+            
+        if crs.isGeographic():
+            feedback.pushWarning(
+                f"{crs.authid()} is geographic — lengths will be in degrees. "
+                "Pick a projected CRS (e.g. the local UTM zone) for meaningful sinuosity.")
+        
         river_geom = QgsGeometry(river_feature.geometry())
 
         source_crs = river_source.sourceCrs()
@@ -318,49 +339,56 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
         func.setSourceCrs(crs, context.transformContext())
         func.setEllipsoid(crs.ellipsoidAcronym())
 
-        total_length_m = func.measureLength(river_geom)
-        feedback.pushInfo(f"Total river length: {total_length_m / 1000:.4f} km")
-
         if segment_mode == 0:
-            # "Length (km)" mode — user specifies the segment length.
-            segment_length_km = self.parameterAsDouble(
-                parameters, self.SEGMENT_LENGTH, context)
-            segment_length_m = segment_length_km * 1000
-        else:
-            # "Number of segments" mode — user specifies count.
-            # Derive segment length by dividing total length evenly.
-            n_segments = self.parameterAsInt(
-                parameters, self.SEGMENT_COUNT, context)
-            if n_segments < 1:
+            mem_uri = f"LineString?crs={crs.authid()}&field=temp_id:integer"
+            segment_layer = QgsVectorLayer(mem_uri, "single_river", "memory")
+            if not segment_layer.isValid():
                 raise QgsProcessingException(
-                    "Number of segments must be at least 1.")
-            segment_length_m = total_length_m / n_segments
+                    "Failed to create temporary layer.")
+            feat = QgsFeature(segment_layer.fields())
+            feat.setGeometry(river_geom)
+            feat.setAttributes([1])
+            segment_layer.dataProvider().addFeature(feat)
+        else:
+            total_length_m = func.measureLength(river_geom)
+            feedback.pushInfo(
+                f"Total river length: {total_length_m / 1000:.4f} km")
 
-        feedback.pushInfo(
-            f"Segment length: {segment_length_m:.0f} m")
+            if segment_mode == 1:
+                # "Length (km)" mode — user specifies the segment length.
+                segment_length_m = self.parameterAsDouble(
+                    parameters, self.SEGMENT_LENGTH, context) * 1000
+            else:
+                # "Number of segments" mode — user specifies count.
+                # Derive segment length by dividing total length evenly.
+                n_segments = self.parameterAsInt(
+                    parameters, self.SEGMENT_COUNT, context)
+                if n_segments < 1:
+                    raise QgsProcessingException(
+                        "Number of segments must be at least 1.")
+                segment_length_m = total_length_m / n_segments
 
+            feedback.pushInfo(f"Segment length: {segment_length_m:.0f} m")
 
-        mem_uri = f"LineString?crs={crs.authid()}&field=temp_id:integer"
-        single_layer = QgsVectorLayer(mem_uri, "single_river", "memory")
-        if not single_layer.isValid():
-            raise QgsProcessingException(
-                "Failed to create temporary layer for splitting.")
+            mem_uri = f"LineString?crs={crs.authid()}&field=temp_id:integer"
+            single_layer = QgsVectorLayer(mem_uri, "single_river", "memory")
+            if not single_layer.isValid():
+                raise QgsProcessingException(
+                    "Failed to create temporary layer for splitting.")
+            single_feat = QgsFeature(single_layer.fields())
+            single_feat.setGeometry(river_geom)
+            single_feat.setAttributes([1])
+            single_layer.dataProvider().addFeature(single_feat)
 
-        single_feat = QgsFeature(single_layer.fields())
-        single_feat.setGeometry(river_geom)
-        single_feat.setAttributes([1])
-        single_layer.dataProvider().addFeature(single_feat)
-
-        segment_layer = split_river_by_length(
-            single_layer, segment_length_m, context, feedback)
+            segment_layer = split_river_by_length(
+                single_layer, segment_length_m, context, feedback)
 
         if segment_layer is None or segment_layer.featureCount() == 0:
             raise QgsProcessingException(
-                "Splitting produced no segments. "
+                "Segmentation produced no segments. "
                 "Check that the river geometry is valid.")
-
         total_segments = segment_layer.featureCount()
-        feedback.pushInfo(f"Created {total_segments} segments")
+        feedback.pushInfo(f"Created {total_segments} segment(s)")
 
 
         feedback.pushInfo("=== Phase 3: Preparing imagery and output ===")
@@ -454,7 +482,12 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
             river_ee_geom = qgs_geometry_to_ee_geometry(seg_geom, crs, context)
             aoi = river_ee_geom.buffer(buffer_m)
 
-            ic = ee.ImageCollection(collection_id)
+            if isinstance(sensor_cfg["collection"], list):
+                ic = ee.ImageCollection(sensor_cfg["collection"][0])
+                for extra_id in sensor_cfg["collection"][1:]:
+                    ic = ic.merge(ee.ImageCollection(extra_id))
+            else:
+                ic = ee.ImageCollection(collection_id)
             ic = ic.filterDate(start_date, end_date)
             ic = ic.filterBounds(aoi)
             ic = ic.filter(ee.Filter.lte(cloud_prop, max_cloud))

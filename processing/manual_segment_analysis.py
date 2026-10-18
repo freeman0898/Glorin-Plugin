@@ -65,7 +65,7 @@ SENSOR_CONFIG = {
         "native_scale": 10,
     },
     "Landsat 8/9 C2 L2": {
-        "collection": "LANDSAT/LC09/C02/T1_L2",
+        "collection": ["LANDSAT/LC08/C02/T1_L2","LANDSAT/LC09/C02/T1_L2"],
         "bands": {
             "green": "SR_B3",
             "red": "SR_B4",
@@ -406,8 +406,9 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
             'Input river layer',
             [QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterCrs(
-            'CRS',
-            'Desired CRS (UTM)'))
+            self.CRS,
+            "Working CRS (leave unset to use the river layer's CRS) (UTM recommended)",
+            optional=True))
         self.addParameter(QgsProcessingParameterPoint(
             'START POINT',
             'Start point',))
@@ -464,6 +465,16 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
         
     def processAlgorithm(self, parameters, context, feedback):
         
+        from .. import config
+        
+        ee_config = config.EarthEngineConfig()
+        if not ee_config.read():
+            raise QgsProcessingException(
+                "Not signed in to Google Earth Engine. "
+                "Sign in via Plugins ▸ GLORIN ▸ Sign in to Earth Engine, "
+                "then run this tool again."
+            )
+        
         feedback.pushInfo("=== Phase 1: Sinuosity Calculation ===")
         
         river_layer = self.parameterAsLayer(parameters, 'INPUT', context)
@@ -473,6 +484,15 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
         
         if river_layer is None:
             raise QgsProcessingException("No river layer provided.")
+            
+        if not crs.isValid():          
+            crs = river_source.sourceCrs()
+            feedback.pushInfo(f"Using input layer CRS: {crs.authid()}")
+            
+        if crs.isGeographic():
+            feedback.pushWarning(
+                f"{crs.authid()} is geographic — lengths will be in degrees. "
+                "Pick a projected CRS (e.g. the local UTM zone) for meaningful sinuosity.")
             
         reprojected = processing.run(
             'native:reprojectlayer',
@@ -580,7 +600,12 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
         river_geom = qgs_geometry_to_ee_geometry(path_geom)
         aoi = river_geom.buffer(buffer_m)
         
-        ic = ee.ImageCollection(collection_id)
+        if isinstance(sensor_cfg["collection"], list):
+            ic = ee.ImageCollection(sensor_cfg["collection"][0])
+            for extra_id in sensor_cfg["collection"][1:]:
+                ic = ic.merge(ee.ImageCollection(extra_id))
+        else:
+            ic = ee.ImageCollection(collection_id)
         ic = ic.filterDate(start_date, end_date)
         ic = ic.filterBounds(aoi)
         ic = ic.filter(ee.Filter.lte(cloud_prop, max_cloud))
