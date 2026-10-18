@@ -11,11 +11,19 @@ MenuItem = Callable[[QMenu], None]
 
 
 class Separator:
-    """A separator in a menu."""
+    """A separator in a menu, optionally labeled"""
+
+    def __init__(self, label: Optional[str] = None):
+        self.label = label
 
     def __call__(self, menu: QMenu):
         """Render the separator in the given QMenu."""
-        menu.addSeparator()
+        if self.label is None:
+            menu.addSeparator()  # plain divider
+            return
+        action = QAction(self.label, menu)
+        action.setSeparator(True)  # non-clickable header line
+        menu.addAction(action)
 
 
 @dataclass
