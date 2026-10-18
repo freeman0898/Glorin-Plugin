@@ -46,10 +46,12 @@ import ee
 from . import  provider, config, ee_auth1, utils, logging
 from .ui import menus
 from . processing.processing_provider import GlorinProcessingProvider
-from . processing.sinuosity import SinuosityAlgorithm
+from . processing.manual_sinuosity import SinuosityAlgorithm
+from . processing.sinuosity_by_segment import SinuosityBySegmentAlgorithm
 from . processing.manual_segment_analysis import ManualSegmentAnalysisAlgorithm
 from . processing.segmented_reach_analysis import SegmentedReachAnalysisAlgorithm
 from . processing.custom_calculator import CustomRasterCalculatorAlgorithm
+from . processing.local_custom_calculation import LocalCustomRasterCalculatorAlgorithm
 
     
 PLUGIN_DIR = os.path.dirname(__file__)
@@ -162,7 +164,7 @@ class Glorin_Sinuosity:
         triggered = lambda: processing.execAlgorithmDialog("glorin:segmented_reach_analysis"),)
         
         sinuosity_button = QtWidgets.QAction(
-        text=self.tr("Measure Sinuosity"),
+        text=self.tr("Measure Sinuosity from Selected Endpoints"),
         parent = self.iface.mainWindow(),
         triggered=lambda: processing.execAlgorithmDialog("glorin:Sinuosity"),)
         
@@ -175,6 +177,16 @@ class Glorin_Sinuosity:
         text=self.tr("Custom Calculation"),
         parent=self.iface.mainWindow(),
         triggered=lambda: processing.execAlgorithmDialog("glorin:custom_raster_calculator"),)
+        
+        sinuosity_by_segment_button = QtWidgets.QAction(
+        text=self.tr("Measure River Segment Sinuosity"),
+        parent = self.iface.mainWindow(),
+        triggered=lambda: processing.execAlgorithmDialog("glorin:sinuosity_by_segment"),)
+        
+        local_custom_calculation_button = QtWidgets.QAction(
+        text=self.tr("Custom Calculation from Local Imagery"),
+        parent = self.iface.mainWindow(),
+        triggered=lambda: processing.execAlgorithmDialog("glorin:local_custom_raster_calculator"),)
         
         plugin_menu = cast(QtWidgets.QMenu, self.iface.pluginMenu())
         self.menu = plugin_menu.addMenu(
@@ -212,8 +224,11 @@ class Glorin_Sinuosity:
             items=[
             menus.Action(action=sign_in_action),
             menus.Action(action=self.set_cloud_project_action),
-            menus.Separator(),
+            menus.Separator("Offline Tools"),
             menus.Action(action=sinuosity_button),
+            menus.Action(action=sinuosity_by_segment_button),
+            menus.Action(action=local_custom_calculation_button),
+            menus.Separator("Online Tools"),
             menus.Action(action=manual_segment_analysis_button),
             menus.Action(action=segmented_reach_analysis_button),
             menus.Action(action=custom_calculator_button)],)        
@@ -222,7 +237,8 @@ class Glorin_Sinuosity:
         
         for name in ('sign_in_action', 'set_cloud_project_action',
                  'segmented_reach_analysis_button', 'sinuosity_button',
-                 'manual_segment_analysis_button', 'custom_calculator_button'):
+                 'manual_segment_analysis_button', 'custom_calculator_button',
+                 'sinuosity_by_segment_button', 'local_custom_calculation_button',):
             act = getattr(self, name, None)
             if act is not None:
                 self.menu.removeAction(act)

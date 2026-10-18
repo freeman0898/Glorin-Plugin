@@ -6,8 +6,9 @@
 name=Glorin Sinuosity
 qgisMinimumVersion=3.0
 description=Finds sinuosity of a segment of river and calculates environmental 
-	statistics of within a given area around said segment. Designed to be used 
-	with the Glorin Dataset
+	statistics of within a given area around said segment. This plugin has
+	functions that require the user to have a Google Earth Engine acount
+	and project.
 version=1.0
 author=Jacob Freeman
 email=freeman0898@gmail.com
@@ -15,6 +16,9 @@ email=freeman0898@gmail.com
 
 about=Finds sinuosity of a segment of river and calculates environmental 
 	statistics of the surrounding area using Google Earth Engine for aerial imagery.
+	Does require the user to have a Google Earth Engine (GEE) account
+	and project. It is recommended for the user to sign into their GEE account upon
+	downloading the plugin to ensure all functions are available.
 	<p>Developed by Jacob Freeman.</p>
 	<p>Supervised by <a href="mailto:nones@igf.edu.pl">Dr.hab. Michael Nones</a>
 	and <a href="mailto:kaveh.ghahraman@igf.edu.pl">Dr. Kaveh Ghahraman</a>.</p>
