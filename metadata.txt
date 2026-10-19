@@ -22,6 +22,9 @@ about=Finds sinuosity of a segment of river and calculates environmental
 	<p>Developed by Jacob Freeman.</p>
 	<p>Supervised by <a href="mailto:nones@igf.edu.pl">Dr.hab. Michael Nones</a>
 	and <a href="mailto:kaveh.ghahraman@igf.edu.pl">Dr. Kaveh Ghahraman</a>.</p>
+	
+	This plugin was aided with the use of GreenPT AI to help troubleshoot code errors
+	during development. All code has been reviewed and tested by the author.
 
 tracker=https://github.com/freeman0898/Glorin-Plugin.git
 repository=https://github.com/freeman0898/Glorin-Plugin.git
