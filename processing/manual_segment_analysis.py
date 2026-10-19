@@ -553,8 +553,6 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
         for feature in path_layer.getFeatures():
             geom = feature.geometry()
             river_length += func.measureLength(geom) / 1000
-            # Keep the last geometry — for a single path there's
-            # typically one feature. If multiple, we merge below.
             if path_geom is None:
                 path_geom = QgsGeometry(geom)
             else:
@@ -649,15 +647,14 @@ class ManualSegmentAnalysisAlgorithm(QgsProcessingAlgorithm):
         safe_keys = [k.replace("-", "_").replace(" ", "_") for k in stat_keys]
 
         if is_csv:
-            # --- direct CSV write: full control of column order and quoting ---
             import csv
             with open(dest_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(["crow_flies", "river_length", "sinuosity"]
-                                + safe_keys + ["WKT"])          # geometry last
+                                + safe_keys + ["WKT"])         
                 writer.writerow([crow, river_length, sinuosity]
                                 + stat_values
-                                + [path_geom.asWkt()])          # one quoted cell
+                                + [path_geom.asWkt()])          
 
             feedback.pushInfo(f"Output written to {dest_path}")
             return {self.OUTPUT: dest_path}

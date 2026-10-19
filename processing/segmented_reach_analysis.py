@@ -355,12 +355,9 @@ class SegmentedReachAnalysisAlgorithm(QgsProcessingAlgorithm):
                 f"Total river length: {total_length_m / 1000:.4f} km")
 
             if segment_mode == 1:
-                # "Length (km)" mode — user specifies the segment length.
                 segment_length_m = self.parameterAsDouble(
                     parameters, self.SEGMENT_LENGTH, context) * 1000
             else:
-                # "Number of segments" mode — user specifies count.
-                # Derive segment length by dividing total length evenly.
                 n_segments = self.parameterAsInt(
                     parameters, self.SEGMENT_COUNT, context)
                 if n_segments < 1:
